@@ -1,12 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
-import { Users, UserCheck, CalendarOff, Clock } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog'
+import { Users, UserCheck, CalendarOff, Clock, X, Edit2, AlertCircle } from 'lucide-react'
 import { format } from 'date-fns'
 import { StatusBadge } from '@/components/status-badge'
 import { LeaveTypeBadge } from '@/components/leave-type-badge'
+import { cancelLeave } from '@/app/actions/leave'
+import { toast } from 'sonner'
 
 interface DashboardData {
   leaves: Array<{
@@ -16,7 +21,10 @@ interface DashboardData {
     start_date: string
     end_date: string
     days_count: number
+    is_half_day?: boolean
+    half_day_period?: string
     status: string
+    rejection_reason?: string
     created_at: string
   }>
   balances: Array<{
@@ -31,6 +39,20 @@ interface DashboardData {
   }
 }
 
+interface Leave {
+  id: string
+  leave_type: string
+  reason: string
+  start_date: string
+  end_date: string
+  days_count: number
+  is_half_day?: boolean
+  half_day_period?: string
+  status: string
+  rejection_reason?: string
+  created_at: string
+}
+
 export function DashboardTab({ 
   userId, 
   isApprover
@@ -40,54 +62,76 @@ export function DashboardTab({
 }) {
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+  const [selectedLeave, setSelectedLeave] = useState<Leave | null>(null)
+  const [actionLoading, setActionLoading] = useState(false)
 
-  useEffect(() => {
+  const fetchData = useCallback(async () => {
     const supabase = createClient()
+    setLoading(true)
     
-    async function fetchData() {
-      setLoading(true)
-      
-      const currentYear = new Date().getFullYear()
-      const today = new Date().toISOString().split('T')[0]
+    const currentYear = new Date().getFullYear()
+    const today = new Date().toISOString().split('T')[0]
 
-      // Fetch leaves
-      const { data: leaves } = await supabase
+    // Fetch leaves
+    const { data: leaves } = await supabase
+      .from('leave_requests')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(10)
+
+    // Fetch balances
+    const { data: balances } = await supabase
+      .from('leave_balances')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('year', currentYear)
+
+    // Stats for approvers
+    let stats = { totalEmployees: 0, onLeaveToday: 0 }
+    if (isApprover) {
+      const { count: total } = await supabase.from('profiles').select('*', { count: 'exact', head: true })
+      const { count: onLeave } = await supabase
         .from('leave_requests')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(10)
-
-      // Fetch balances
-      const { data: balances } = await supabase
-        .from('leave_balances')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('year', currentYear)
-
-      // Stats for approvers
-      let stats = { totalEmployees: 0, onLeaveToday: 0 }
-      if (isApprover) {
-        const { count: total } = await supabase.from('profiles').select('*', { count: 'exact', head: true })
-        const { count: onLeave } = await supabase
-          .from('leave_requests')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'approved')
-          .lte('start_date', today)
-          .gte('end_date', today)
-        stats = { totalEmployees: total || 0, onLeaveToday: onLeave || 0 }
-      }
-
-      setData({
-        leaves: leaves || [],
-        balances: balances || [],
-        stats
-      })
-      setLoading(false)
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'approved')
+        .lte('start_date', today)
+        .gte('end_date', today)
+      stats = { totalEmployees: total || 0, onLeaveToday: onLeave || 0 }
     }
 
-    fetchData()
+    setData({
+      leaves: leaves || [],
+      balances: balances || [],
+      stats
+    })
+    setLoading(false)
   }, [userId, isApprover])
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData])
+
+  const handleCancelClick = (leave: Leave) => {
+    setSelectedLeave(leave)
+    setCancelDialogOpen(true)
+  }
+
+  const handleCancelConfirm = async () => {
+    if (!selectedLeave) return
+    setActionLoading(true)
+    
+    const result = await cancelLeave(selectedLeave.id)
+    if (result.error) {
+      toast.error(result.error)
+    } else {
+      toast.success('Leave request cancelled')
+      fetchData()
+    }
+    setActionLoading(false)
+    setCancelDialogOpen(false)
+  }
 
   if (loading) {
     return (
@@ -183,27 +227,67 @@ export function DashboardTab({
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Dates</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Days</th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {data?.leaves.map((leave) => (
                   <tr key={leave.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                     <td className="px-4 py-2">
-                      <LeaveTypeBadge type={leave.leave_type || 'casual'} />
+                      <div className="flex items-center gap-1">
+                        <LeaveTypeBadge type={leave.leave_type || 'casual'} />
+                        {leave.is_half_day && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {leave.half_day_period === 'morning' ? 'AM' : 'PM'}
+                          </Badge>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-4 py-2 max-w-[200px] truncate text-gray-600">{leave.reason}</td>
+                    <td className="px-4 py-2 max-w-[200px]">
+                      <p className="truncate text-gray-600" title={leave.reason}>{leave.reason}</p>
+                      {leave.status === 'rejected' && leave.rejection_reason && (
+                        <p className="text-xs text-red-500 truncate" title={leave.rejection_reason}>
+                          Reason: {leave.rejection_reason}
+                        </p>
+                      )}
+                    </td>
                     <td className="px-4 py-2 text-gray-600">
                       {format(new Date(leave.start_date), 'MMM d')} - {format(new Date(leave.end_date), 'MMM d')}
                     </td>
-                    <td className="px-4 py-2 text-gray-600">{leave.days_count}</td>
+                    <td className="px-4 py-2 text-gray-600">
+                      {leave.is_half_day ? '0.5' : leave.days_count}
+                    </td>
                     <td className="px-4 py-2">
                       <StatusBadge status={leave.status} />
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      {leave.status === 'pending' && (
+                        <div className="flex justify-end gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-gray-500 hover:text-blue-600"
+                            title="Edit"
+                          >
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-gray-500 hover:text-red-600"
+                            onClick={() => handleCancelClick(leave)}
+                            title="Cancel"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
                 {(!data?.leaves || data.leaves.length === 0) && (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
                       No leave requests yet
                     </td>
                   </tr>
@@ -213,6 +297,49 @@ export function DashboardTab({
           </div>
         </Card>
       </div>
+
+      {/* Cancel Confirmation Dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-orange-500" />
+              Cancel Leave Request
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel this leave request?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4 space-y-2">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Leave Type:</span>
+                <span className="text-sm font-medium capitalize">{selectedLeave?.leave_type?.replace(/_/g, ' ')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Dates:</span>
+                <span className="text-sm font-medium">
+                  {selectedLeave && format(new Date(selectedLeave.start_date), 'MMM d, yyyy')} - {selectedLeave && format(new Date(selectedLeave.end_date), 'MMM d, yyyy')}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Days:</span>
+                <span className="text-sm font-medium">
+                  {selectedLeave?.is_half_day ? '0.5 (Half Day)' : selectedLeave?.days_count}
+                </span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Keep Request</Button>
+            </DialogClose>
+            <Button variant="destructive" onClick={handleCancelConfirm} disabled={actionLoading}>
+              {actionLoading ? 'Cancelling...' : 'Cancel Request'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

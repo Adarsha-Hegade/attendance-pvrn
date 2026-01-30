@@ -6,10 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog'
 import { LeaveTypeBadge } from '@/components/leave-type-badge'
 import { format } from 'date-fns'
-import { Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { Clock, CheckCircle, XCircle, AlertCircle, CheckCheck } from 'lucide-react'
 import { approveLeave, rejectLeave } from '@/app/actions/leave'
 import { toast } from 'sonner'
 
@@ -20,6 +20,8 @@ interface Leave {
   start_date: string
   end_date: string
   days_count: number
+  is_half_day?: boolean
+  half_day_period?: string
   status: string
   created_at: string
   profiles: { full_name: string; email: string }
@@ -30,8 +32,14 @@ export function ApprovalsTab() {
   const [recentLeaves, setRecentLeaves] = useState<Leave[]>([])
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+  
+  // Approve dialog state
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false)
+  const [selectedApproveLeave, setSelectedApproveLeave] = useState<Leave | null>(null)
+  
+  // Reject dialog state
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false)
-  const [selectedLeave, setSelectedLeave] = useState<Leave | null>(null)
+  const [selectedRejectLeave, setSelectedRejectLeave] = useState<Leave | null>(null)
   const [rejectReason, setRejectReason] = useState('')
 
   const fetchData = useCallback(async () => {
@@ -59,9 +67,16 @@ export function ApprovalsTab() {
     fetchData()
   }, [fetchData])
 
-  const handleApprove = async (id: string) => {
-    setActionLoading(id)
-    const result = await approveLeave(id)
+  const handleApproveClick = (leave: Leave) => {
+    setSelectedApproveLeave(leave)
+    setApproveDialogOpen(true)
+  }
+
+  const handleApproveConfirm = async () => {
+    if (!selectedApproveLeave) return
+    setActionLoading(selectedApproveLeave.id)
+    
+    const result = await approveLeave(selectedApproveLeave.id)
     if (result.error) {
       toast.error(result.error)
     } else {
@@ -69,19 +84,24 @@ export function ApprovalsTab() {
       fetchData()
     }
     setActionLoading(null)
+    setApproveDialogOpen(false)
   }
 
   const handleRejectClick = (leave: Leave) => {
-    setSelectedLeave(leave)
+    setSelectedRejectLeave(leave)
     setRejectReason('')
     setRejectDialogOpen(true)
   }
 
   const handleRejectConfirm = async () => {
-    if (!selectedLeave) return
-    setActionLoading(selectedLeave.id)
+    if (!selectedRejectLeave) return
+    if (!rejectReason.trim()) {
+      toast.error('Please provide a reason for rejection')
+      return
+    }
+    setActionLoading(selectedRejectLeave.id)
     
-    const result = await rejectLeave(selectedLeave.id, rejectReason)
+    const result = await rejectLeave(selectedRejectLeave.id, rejectReason)
     if (result.error) {
       toast.error(result.error)
     } else {
@@ -155,7 +175,14 @@ export function ApprovalsTab() {
                       <div className="text-xs text-gray-500">{leave.profiles?.email}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <LeaveTypeBadge type={leave.leave_type || 'casual'} />
+                      <div className="flex items-center gap-1">
+                        <LeaveTypeBadge type={leave.leave_type || 'casual'} />
+                        {leave.is_half_day && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {leave.half_day_period === 'morning' ? 'AM' : 'PM'}
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 max-w-[200px]">
                       <p className="truncate" title={leave.reason}>{leave.reason}</p>
@@ -164,14 +191,16 @@ export function ApprovalsTab() {
                       {format(new Date(leave.start_date), 'MMM d')} - {format(new Date(leave.end_date), 'MMM d')}
                     </td>
                     <td className="px-4 py-3">
-                      <Badge variant="outline">{leave.days_count || 1}</Badge>
+                      <Badge variant="outline">
+                        {leave.is_half_day ? '0.5' : leave.days_count || 1}
+                      </Badge>
                     </td>
                     <td className="px-4 py-3 text-right space-x-2">
                       <Button
                         size="sm"
                         variant="default"
                         className="bg-green-600 hover:bg-green-700"
-                        onClick={() => handleApprove(leave.id)}
+                        onClick={() => handleApproveClick(leave)}
                         disabled={actionLoading === leave.id}
                       >
                         {actionLoading === leave.id ? '...' : 'Approve'}
@@ -227,6 +256,61 @@ export function ApprovalsTab() {
         </CardContent>
       </Card>
 
+      {/* Approve Confirmation Dialog */}
+      <Dialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCheck className="h-5 w-5 text-green-500" />
+              Approve Leave Request
+            </DialogTitle>
+            <DialogDescription>
+              Please confirm that you want to approve this leave request.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-2">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Employee:</span>
+                <span className="text-sm font-medium">{selectedApproveLeave?.profiles?.full_name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Leave Type:</span>
+                <span className="text-sm font-medium capitalize">{selectedApproveLeave?.leave_type?.replace(/_/g, ' ')}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Dates:</span>
+                <span className="text-sm font-medium">
+                  {selectedApproveLeave && format(new Date(selectedApproveLeave.start_date), 'MMM d, yyyy')} - {selectedApproveLeave && format(new Date(selectedApproveLeave.end_date), 'MMM d, yyyy')}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Days:</span>
+                <span className="text-sm font-medium">
+                  {selectedApproveLeave?.is_half_day ? '0.5 (Half Day)' : selectedApproveLeave?.days_count}
+                </span>
+              </div>
+              <div className="pt-2 border-t border-green-200">
+                <span className="text-sm text-gray-600">Reason:</span>
+                <p className="text-sm mt-1">{selectedApproveLeave?.reason}</p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button 
+              className="bg-green-600 hover:bg-green-700" 
+              onClick={handleApproveConfirm} 
+              disabled={actionLoading !== null}
+            >
+              Confirm Approval
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Reject Dialog */}
       <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
         <DialogContent>
@@ -235,15 +319,28 @@ export function ApprovalsTab() {
               <AlertCircle className="h-5 w-5 text-red-500" />
               Reject Leave Request
             </DialogTitle>
+            <DialogDescription>
+              Please provide a reason for rejecting this leave request.
+            </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-sm text-gray-600 mb-4">
-              Rejecting leave request from <strong>{selectedLeave?.profiles?.full_name}</strong> for{' '}
-              {selectedLeave && format(new Date(selectedLeave.start_date), 'MMM d')} - {selectedLeave && format(new Date(selectedLeave.end_date), 'MMM d')}
-            </p>
-            <label className="text-sm font-medium">Reason for rejection (optional)</label>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4 space-y-2">
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Employee:</span>
+                <span className="text-sm font-medium">{selectedRejectLeave?.profiles?.full_name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-sm text-gray-600">Dates:</span>
+                <span className="text-sm font-medium">
+                  {selectedRejectLeave && format(new Date(selectedRejectLeave.start_date), 'MMM d')} - {selectedRejectLeave && format(new Date(selectedRejectLeave.end_date), 'MMM d')}
+                </span>
+              </div>
+            </div>
+            <label className="text-sm font-medium">
+              Reason for rejection <span className="text-red-500">*</span>
+            </label>
             <Textarea
-              placeholder="Provide a reason for rejection..."
+              placeholder="Please provide a detailed reason for rejection..."
               value={rejectReason}
               onChange={(e) => setRejectReason(e.target.value)}
               className="mt-2"
@@ -254,7 +351,7 @@ export function ApprovalsTab() {
             <DialogClose asChild>
               <Button variant="outline">Cancel</Button>
             </DialogClose>
-            <Button variant="destructive" onClick={handleRejectConfirm} disabled={actionLoading !== null}>
+            <Button variant="destructive" onClick={handleRejectConfirm} disabled={actionLoading !== null || !rejectReason.trim()}>
               Confirm Rejection
             </Button>
           </DialogFooter>

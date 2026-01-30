@@ -177,13 +177,31 @@ export function AppShell({
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto flex flex-col">
         <div className={cn(
-          "transition-opacity duration-150",
+          "flex-1 transition-opacity duration-150",
           isPending ? "opacity-50" : "opacity-100"
         )}>
           {renderTabContent()}
         </div>
+        
+        {/* Footer */}
+        <footer className="border-t border-gray-200 dark:border-gray-700 py-3 px-6 bg-white dark:bg-gray-800">
+          <div className="flex items-center justify-between text-xs text-gray-500">
+            <span>© {new Date().getFullYear()} LeavePortal. All rights reserved.</span>
+            <span className="flex items-center gap-1">
+              Designed and developed by{' '}
+              <a 
+                href="https://inktype.io" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="font-medium text-blue-600 hover:text-blue-800 transition-colors"
+              >
+                Inktype Labs
+              </a>
+            </span>
+          </div>
+        </footer>
       </main>
     </div>
   )
