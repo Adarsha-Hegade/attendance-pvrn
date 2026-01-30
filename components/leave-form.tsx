@@ -12,7 +12,6 @@ import { Calendar } from "@/components/ui/calendar"
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -38,8 +37,8 @@ const FormSchema = z.object({
   dateRange: z.object({
       from: z.date(),
       to: z.date().optional()
-  }, { required_error: "Date is required" }),
-  leave_type: z.string({ required_error: "Please select a leave type" }),
+  }),
+  leave_type: z.string().min(1, "Please select a leave type"),
   reason: z.string().min(5, {
     message: "Reason must be at least 5 characters.",
   }),
