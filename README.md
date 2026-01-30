@@ -1,36 +1,64 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Leave Approval System
 
-## Getting Started
+A production-ready internal tool for managing employee leave requests.
 
-First, run the development server:
+## 🛠 Tech Stack
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- **Framework**: Next.js 15 (App Router)
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS + shadcn/ui
+- **Backend / DB**: Supabase (PostgreSQL, Auth, RLS)
+- **Icons**: Lucide React
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 🚀 Setup Instructions
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. **Install Dependencies**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+   ```bash
+   npm install
+   ```
 
-## Learn More
+2. **Configure Supabase**
+   - Create a new project on [Supabase](https://supabase.com).
+   - Go to the **SQL Editor** and paste the content of `schema.sql`. Run it to set up tables, RLS policies, and triggers.
+   - Go to **Authentication > Providers** and enable **Google**. Add the redirect URL: `http://localhost:3000/auth/callback` (and your production URL).
 
-To learn more about Next.js, take a look at the following resources:
+3. **Environment Variables**
+   - Rename `env.example` in file `.env.local` (or create it) with your Supabase keys:
+     ```env
+     NEXT_PUBLIC_SUPABASE_URL=your_project_url
+     NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+     ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+4. **Run Locally**
+   ```bash
+   npm run dev
+   ```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 📂 Project Structure
 
-## Deploy on Vercel
+- `app/` - Next.js App Router pages
+  - `login/` - Login page
+  - `dashboard/` - Employee Dashboard (My Leaves)
+  - `apply-leave/` - Leave Application Form
+  - `approvals/` - Approver Dashboard (Pending Requests)
+  - `actions/` - Server Actions (Create, Approve, Reject)
+  - `auth/` - Auth Callback route
+- `components/` - React components (UI + Business logic)
+- `utils/supabase/` - Supabase clients (Server, Browser, Middleware)
+- `schema.sql` - Database migrations and RLS policies
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 🔐 Security & Roles
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **RLS (Row Level Security)** is enforced:
+  - **Employees**: Can only view their own leaves.
+  - **Approvers**: Can view all pending leaves and all leave details.
+  - **Actions**: Only approvers can approve/reject.
+- **Roles**: Defined in `profiles` table. Default is `employee`. Manually update a user to `approver` in Supabase table editor or via SQL `UPDATE public.profiles SET role = 'approver' WHERE email = '...';`
+
+## 🧪 Deployment
+
+1. Push to GitHub.
+2. Deploy on Vercel.
+3. Add Environment Variables in Vercel Project Settings.
+4. Update Supabase Auth Redirect URL to your Vercel domain.

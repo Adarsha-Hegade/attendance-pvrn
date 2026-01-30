@@ -1,0 +1,4 @@
+- Email notifications
+- Leave balance tracking
+- Company holiday calendar
+- Payroll export
