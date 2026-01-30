@@ -20,7 +20,7 @@ export async function login(formData: FormData) {
   }
 
   revalidatePath('/', 'layout')
-  redirect('/dashboard')
+  redirect('/app')
 }
 
 export async function signup(formData: FormData) {
@@ -54,7 +54,7 @@ export async function signup(formData: FormData) {
 
   console.log('Signup successful, session created. Redirecting...')
   revalidatePath('/', 'layout')
-  redirect('/dashboard')
+  redirect('/app')
 }
 
 export async function signout() {

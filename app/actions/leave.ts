@@ -109,7 +109,7 @@ export async function approveLeave(id: string) {
   return { success: true }
 }
 
-export async function rejectLeave(id: string) {
+export async function rejectLeave(id: string, reason?: string) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   
@@ -117,7 +117,10 @@ export async function rejectLeave(id: string) {
 
   const { error } = await supabase
     .from('leave_requests')
-    .update({ status: 'rejected' })
+    .update({ 
+      status: 'rejected',
+      rejection_reason: reason || null
+    })
     .eq('id', id)
     .eq('status', 'pending')
 

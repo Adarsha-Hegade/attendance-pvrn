@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { LogoutButton } from '@/components/logout-button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Users, CalendarCheck, Clock, UserCheck } from 'lucide-react'
+import { Users, CalendarCheck, UserCheck } from 'lucide-react'
 
 export default async function Dashboard() {
   const supabase = await createClient()
@@ -33,7 +33,7 @@ export default async function Dashboard() {
     .eq('year', currentYear)
   
   // 3. Admin / Approver Data
-  let stats = {
+  const stats = {
       totalEmployees: 0,
       onLeaveToday: 0
   }
@@ -62,7 +62,13 @@ export default async function Dashboard() {
             <h1 className="text-2xl font-bold">Dashboard</h1>
             <p className="text-gray-500">Welcome back, {user.email}</p>
         </div>
-        <div className="flex gap-2 items-center">
+        <div className="flex gap-2 items-center flex-wrap">
+            <Button variant="outline" asChild>
+                <Link href="/directory">Directory</Link>
+            </Button>
+            <Button variant="outline" asChild>
+                <Link href="/calendar">Calendar</Link>
+            </Button>
             {profile?.role === 'approver' && (
                 <>
                 <Button variant="outline" asChild>
@@ -70,6 +76,9 @@ export default async function Dashboard() {
                 </Button>
                 <Button variant="outline" asChild>
                     <Link href="/approvals">Approvals</Link>
+                </Button>
+                <Button variant="outline" asChild>
+                    <Link href="/admin">Admin</Link>
                 </Button>
                 </>
             )}
