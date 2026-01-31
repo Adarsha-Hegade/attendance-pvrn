@@ -106,7 +106,7 @@ export function AppShell({
         <div className="h-14 flex items-center justify-between px-4 border-b border-gray-200 dark:border-gray-700">
           {!isCollapsed && (
             <span className="font-bold text-lg bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              LeavePortal
+              PVRN Leave Portal
             </span>
           )}
           <Button 
