@@ -189,8 +189,8 @@ export function AppShell({
         <footer className="border-t border-gray-200 dark:border-gray-700 py-3 px-6 bg-white dark:bg-gray-800">
           <div className="flex items-center justify-between text-xs text-gray-500">
             <span>© {new Date().getFullYear()} LeavePortal. All rights reserved.</span>
-            <span className="flex items-center gap-1">
-              Designed and developed by{' '}
+            {/* <span className="flex items-center gap-1"> */}
+              {/* Designed and developed by{' '}
               <a 
                 href="https://inktype.io" 
                 target="_blank" 
@@ -199,7 +199,7 @@ export function AppShell({
               >
                 Inktype Labs
               </a>
-            </span>
+            </span> */}
           </div>
         </footer>
       </main>
